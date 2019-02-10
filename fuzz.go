@@ -33,13 +33,14 @@ var fuzzStrings = []string{
 	"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
 }
 
-func fuzzRegix(fset *token.FileSet, re []regex) error {
+func fuzzRegix(fset *token.FileSet, re []regex, opts Options) error {
 
 	for _, r := range re {
 		testRegex, err := regexp.Compile(r.expression)
 		if err != nil {
 			return err
 		}
+		fd := fset.File(r.pos)
 
 		ch := make(chan bool, 1)
 		defer close(ch)
@@ -57,11 +58,12 @@ func fuzzRegix(fset *token.FileSet, re []regex) error {
 
 		select {
 		case <-ch:
-			// TODO If verbose, Print info
+			if opts.Verbose {
+				fmt.Printf("GOOD REGEX at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
+			}
 			continue
 		case <-timer.C:
 			// Timeout
-			fd := fset.File(r.pos)
 			fmt.Printf("EVIL REGEX at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
 		}
 	}

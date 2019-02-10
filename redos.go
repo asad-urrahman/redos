@@ -12,6 +12,11 @@ const (
 	goStandardRegexPkgName = "regexp"
 )
 
+// Command options
+type Options struct {
+	Verbose bool
+}
+
 // Struct for for regex expresion
 type regex struct {
 	expression string
@@ -19,7 +24,7 @@ type regex struct {
 }
 
 // ScanDir scan pass directory recursively for regex expresions
-func ScanDir(dirName string) {
+func ScanDir(dirName string, opts Options) {
 	fset := token.NewFileSet()
 	// parse directory
 	pkgs, err := parser.ParseDir(fset, dirName, nil, parser.AllErrors)
@@ -28,7 +33,7 @@ func ScanDir(dirName string) {
 	}
 
 	regExpresions := extractAllRegExpressions(pkgs)
-	fuzzRegix(fset, regExpresions)
+	fuzzRegix(fset, regExpresions, opts)
 }
 
 // Extract all regex expresions
