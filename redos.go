@@ -46,7 +46,7 @@ func ScanDir(dirName string) {
 		}
 	}
 
-	fuzzRegix(regExpresions)
+	fuzzRegix(fset, regExpresions)
 }
 
 func isRegexpImported(file *ast.File) bool {
@@ -85,7 +85,7 @@ func extractRegexExpression(node ast.Node) bool {
 
 }
 
-func fuzzRegix(re []regex) error {
+func fuzzRegix(fset *token.FileSet, re []regex) error {
 
 	for _, r := range re {
 		testRegex, err := regexp.Compile(r.expression)
@@ -113,7 +113,8 @@ func fuzzRegix(re []regex) error {
 			continue
 		case <-timer.C:
 			// Timeout
-			fmt.Printf("EVIL REGEX: %v \n", r.expression)
+			fd := fset.File(r.pos)
+			fmt.Printf("EVIL REGEX at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
 		}
 	}
 
