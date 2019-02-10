@@ -101,8 +101,9 @@ func fuzzRegix(re []regex) error {
 		defer timer.Stop()
 
 		go func() {
-			fuzzString := "aaaaaaaaaaaaaaaaaaaaaaaa!"
-			testRegex.FindAllSubmatch([]byte(fuzzString), -1)
+			for _, v := range fuzzStrings {
+				testRegex.FindAllSubmatch([]byte(v), -1)
+			}
 			ch <- true
 		}()
 
