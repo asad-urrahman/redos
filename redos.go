@@ -6,11 +6,23 @@ import (
 	"go/parser"
 	"go/token"
 	"log"
+	"regexp"
 	"strings"
+	"time"
 )
 
 const (
 	goStandardRegexPkgName = "regexp"
+)
+
+// Struct for for regex expresion
+type regex struct {
+	expression string
+	pos        token.Pos
+}
+
+var (
+	regExpresions []regex
 )
 
 // ScanDir scan pass directory recursively for regex expresions
@@ -33,6 +45,8 @@ func ScanDir(dirName string) {
 			ast.Inspect(astFile, extractRegexExpression)
 		}
 	}
+
+	fuzzRegix(regExpresions)
 }
 
 func isRegexpImported(file *ast.File) bool {
@@ -57,12 +71,50 @@ func extractRegexExpression(node ast.Node) bool {
 			if fcalPkg.Name == goStandardRegexPkgName {
 				// get only first argument "patern"
 				if len(fcall.Args) > 0 {
-					arg := fcall.Args[0]
-					fmt.Printf(" Reg exp : %v\n", arg)
+					re := regex{
+						expression: fcall.Args[0].(*ast.BasicLit).Value,
+						pos:        fcall.Pos(),
+					}
+					regExpresions = append(regExpresions, re)
 				}
 			}
 		}
 		return true
 	}
 	return true
+
+}
+
+func fuzzRegix(re []regex) error {
+
+	for _, r := range re {
+		testRegex, err := regexp.Compile(r.expression)
+		if err != nil {
+			return err
+		}
+
+		ch := make(chan bool, 1)
+		defer close(ch)
+
+		// start timer
+		timer := time.NewTimer(5 * time.Second)
+		defer timer.Stop()
+
+		go func() {
+			fuzzString := "aaaaaaaaaaaaaaaaaaaaaaaa!"
+			testRegex.FindAllSubmatch([]byte(fuzzString), -1)
+			ch <- true
+		}()
+
+		select {
+		case <-ch:
+			// TODO If verbose, Print info
+			continue
+		case <-timer.C:
+			// Timeout
+			fmt.Printf("EVIL REGEX: %v \n", r.expression)
+		}
+	}
+
+	return nil
 }
