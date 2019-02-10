@@ -1,14 +1,11 @@
 package redos
 
 import (
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"log"
-	"regexp"
 	"strings"
-	"time"
 )
 
 const (
@@ -21,20 +18,23 @@ type regex struct {
 	pos        token.Pos
 }
 
-var (
-	regExpresions []regex
-)
-
 // ScanDir scan pass directory recursively for regex expresions
 func ScanDir(dirName string) {
-	// parse directory
 	fset := token.NewFileSet()
+	// parse directory
 	pkgs, err := parser.ParseDir(fset, dirName, nil, parser.AllErrors)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Extract all regex expresions
+	regExpresions := extractAllRegExpressions(pkgs)
+	fuzzRegix(fset, regExpresions)
+}
+
+// Extract all regex expresions
+func extractAllRegExpressions(pkgs map[string]*ast.Package) []regex {
+	var regExpresions []regex
+
 	for _, pkg := range pkgs {
 		for _, astFile := range pkg.Files {
 			// Check if regex pkg is imported
@@ -42,11 +42,34 @@ func ScanDir(dirName string) {
 				continue
 			}
 			// Inspect
-			ast.Inspect(astFile, extractRegexExpression)
+			ast.Inspect(astFile, func(node ast.Node) bool {
+				// Find Functions call
+				fcall, ok := node.(*ast.CallExpr)
+				if ok {
+					// Retrive called packge name
+					fcalPkg, ok := fcall.Fun.(*ast.SelectorExpr).X.(*ast.Ident)
+					if ok {
+						// if called packge is regex package
+						// TODO also check func name
+						if fcalPkg.Name == goStandardRegexPkgName {
+							// get only first argument "patern"
+							if len(fcall.Args) > 0 {
+								re := regex{
+									expression: fcall.Args[0].(*ast.BasicLit).Value,
+									pos:        fcall.Pos(),
+								}
+								regExpresions = append(regExpresions, re)
+								return true
+							}
+						}
+					}
+				}
+				return true
+			})
 		}
 	}
 
-	fuzzRegix(fset, regExpresions)
+	return regExpresions
 }
 
 func isRegexpImported(file *ast.File) bool {
@@ -57,66 +80,4 @@ func isRegexpImported(file *ast.File) bool {
 		}
 	}
 	return false
-}
-
-func extractRegexExpression(node ast.Node) bool {
-	// Find Functions call
-	fcall, ok := node.(*ast.CallExpr)
-	if ok {
-		// Retrive called packge name
-		fcalPkg, ok := fcall.Fun.(*ast.SelectorExpr).X.(*ast.Ident)
-		if ok {
-			// if called packge is regex package
-			// TODO also check func name
-			if fcalPkg.Name == goStandardRegexPkgName {
-				// get only first argument "patern"
-				if len(fcall.Args) > 0 {
-					re := regex{
-						expression: fcall.Args[0].(*ast.BasicLit).Value,
-						pos:        fcall.Pos(),
-					}
-					regExpresions = append(regExpresions, re)
-				}
-			}
-		}
-		return true
-	}
-	return true
-
-}
-
-func fuzzRegix(fset *token.FileSet, re []regex) error {
-
-	for _, r := range re {
-		testRegex, err := regexp.Compile(r.expression)
-		if err != nil {
-			return err
-		}
-
-		ch := make(chan bool, 1)
-		defer close(ch)
-
-		// start timer
-		timer := time.NewTimer(5 * time.Second)
-		defer timer.Stop()
-
-		go func() {
-			for _, v := range fuzzStrings {
-				testRegex.FindAllSubmatch([]byte(v), -1)
-			}
-			ch <- true
-		}()
-
-		select {
-		case <-ch:
-			// TODO If verbose, Print info
-			continue
-		case <-timer.C:
-			// Timeout
-			fd := fset.File(r.pos)
-			fmt.Printf("EVIL REGEX at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
-		}
-	}
-
-	return nil
 }
