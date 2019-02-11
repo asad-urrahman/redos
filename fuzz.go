@@ -54,7 +54,7 @@ func fuzzRegix(fset *token.FileSet, re []regex, opts Options) error {
 		defer close(ch)
 
 		// start timer
-		timer := time.NewTimer(5 * time.Second)
+		timer := time.NewTimer(time.Duration(opts.Timeout) * time.Second)
 		defer timer.Stop()
 
 		go func() {

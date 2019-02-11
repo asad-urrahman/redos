@@ -16,6 +16,7 @@ const (
 type Options struct {
 	Verbose  bool
 	FuzzFile string
+	Timeout  int
 }
 
 // Struct for for regex expresion
