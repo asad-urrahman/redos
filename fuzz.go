@@ -1,9 +1,12 @@
 package redos
 
 import (
+	"bufio"
 	"fmt"
 	"go/token"
+	"os"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -35,6 +38,11 @@ var fuzzStrings = []string{
 
 func fuzzRegix(fset *token.FileSet, re []regex, opts Options) error {
 
+	fuzSource, err := getFuzzSource(opts)
+	if err != nil {
+		return err
+	}
+
 	for _, r := range re {
 		testRegex, err := regexp.Compile(r.expression)
 		if err != nil {
@@ -50,8 +58,8 @@ func fuzzRegix(fset *token.FileSet, re []regex, opts Options) error {
 		defer timer.Stop()
 
 		go func() {
-			for _, v := range fuzzStrings {
-				testRegex.FindAllSubmatch([]byte(v), -1)
+			for fuzSource.Scan() {
+				testRegex.FindAllSubmatch([]byte(fuzSource.Text()), -1)
 			}
 			ch <- true
 		}()
@@ -69,4 +77,23 @@ func fuzzRegix(fset *token.FileSet, re []regex, opts Options) error {
 	}
 
 	return nil
+}
+
+func getFuzzSource(opts Options) (*bufio.Scanner, error) {
+	var scanner *bufio.Scanner
+	if opts.FuzzFile != "" { // File source
+		file, err := os.Open(opts.FuzzFile)
+		if err != nil {
+			panic(err)
+		}
+		scanner = bufio.NewScanner(file)
+		return scanner, nil
+	}
+
+	s := ""
+	for _, v := range fuzzStrings {
+		s += v
+	}
+	scanner = bufio.NewScanner(strings.NewReader(s))
+	return scanner, nil
 }

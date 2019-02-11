@@ -14,7 +14,8 @@ const (
 
 // Command options
 type Options struct {
-	Verbose bool
+	Verbose  bool
+	FuzzFile string
 }
 
 // Struct for for regex expresion
@@ -33,7 +34,8 @@ func ScanDir(dirName string, opts Options) {
 	}
 
 	regExpresions := extractAllRegExpressions(pkgs)
-	fuzzRegix(fset, regExpresions, opts)
+	// TODO handle error
+	_ = fuzzRegix(fset, regExpresions, opts)
 }
 
 // Extract all regex expresions

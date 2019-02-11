@@ -11,11 +11,13 @@ func main() {
 	// usage: redos [-v] ./code-dir
 	// main operation modes
 	verbose := flag.Bool("v", false, "Enable verbose output")
+	fuzFile := flag.String("fuzfile", "", "Input file source for fuzzer")
 	flag.Parse()
 	args := flag.Args()
 
 	opts := redos.Options{
-		Verbose: *verbose,
+		Verbose:  *verbose,
+		FuzzFile: *fuzFile,
 	}
 
 	if len(args) == 0 {
