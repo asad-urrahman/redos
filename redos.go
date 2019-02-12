@@ -17,6 +17,7 @@ type Options struct {
 	Verbose  bool
 	FuzzFile string
 	Timeout  int
+	Regex    string
 }
 
 // Struct for for regex expresion
@@ -27,6 +28,7 @@ type regex struct {
 
 // ScanDir scan pass directory recursively for regex expresions
 func ScanDir(dirName string, opts Options) {
+
 	fset := token.NewFileSet()
 	// parse directory
 	pkgs, err := parser.ParseDir(fset, dirName, nil, parser.AllErrors)

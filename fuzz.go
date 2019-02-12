@@ -36,50 +36,58 @@ var fuzzStrings = []string{
 	"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
 }
 
-func fuzzRegix(fset *token.FileSet, re []regex, opts Options) error {
+func CompileRegix(re string, opts Options, info string) error {
 
-	fuzSource, err := getFuzzSource(opts)
+	fuzSource, err := GetFuzzSource(opts)
 	if err != nil {
 		return err
 	}
 
-	for _, r := range re {
-		testRegex, err := regexp.Compile(r.expression)
-		if err != nil {
-			return err
+	testRegex, err := regexp.Compile(re)
+	if err != nil {
+		return err
+	}
+
+	ch := make(chan bool, 1)
+	defer close(ch)
+
+	// start timer
+	timer := time.NewTimer(time.Duration(opts.Timeout) * time.Second)
+	defer timer.Stop()
+
+	go func() {
+		for fuzSource.Scan() {
+			testRegex.FindAllSubmatch([]byte(fuzSource.Text()), -1)
 		}
-		fd := fset.File(r.pos)
+		ch <- true
+	}()
 
-		ch := make(chan bool, 1)
-		defer close(ch)
-
-		// start timer
-		timer := time.NewTimer(time.Duration(opts.Timeout) * time.Second)
-		defer timer.Stop()
-
-		go func() {
-			for fuzSource.Scan() {
-				testRegex.FindAllSubmatch([]byte(fuzSource.Text()), -1)
-			}
-			ch <- true
-		}()
-
-		select {
-		case <-ch:
-			if opts.Verbose {
-				fmt.Printf("GOOD REGEX at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
-			}
-			continue
-		case <-timer.C:
-			// Timeout
-			fmt.Printf("EVIL REGEX at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
+	select {
+	case <-ch:
+		if opts.Verbose {
+			// fmt.Printf("GOOD REGEX at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
+			fmt.Printf("GOOD REGEX %s\n", info)
 		}
+	case <-timer.C:
+		// Timeout
+		fmt.Printf("EVIL REGEX %s\n", info)
 	}
 
 	return nil
 }
 
-func getFuzzSource(opts Options) (*bufio.Scanner, error) {
+func fuzzRegix(fset *token.FileSet, re []regex, opts Options) error {
+
+	for _, r := range re {
+		fd := fset.File(r.pos)
+		info := fmt.Sprintf("at %v[%0.4d] Reg: %v \n", fd.Name(), fd.Line(r.pos), r.expression)
+		CompileRegix(r.expression, opts, info)
+	}
+
+	return nil
+}
+
+func GetFuzzSource(opts Options) (*bufio.Scanner, error) {
 	var scanner *bufio.Scanner
 	if opts.FuzzFile != "" { // File source
 		file, err := os.Open(opts.FuzzFile)
